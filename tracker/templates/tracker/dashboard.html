@@ -43,7 +43,27 @@
           <td>{{ t.date }}</td>
           <td>{{ t.description }}</td>
           <td>${{ t.amount }}</td>
-          <td>{{ t.category|default:'Uncategorized' }}</td>
+          <td>
+  <form action="{% url 'update_category' %}" method="post" style="margin: 0;">
+    {% csrf_token %}
+
+    <input type="hidden" name="transaction_id" value="{{ t.id }}">
+
+    <select name="category" onchange="this.form.submit()">
+
+      <option value="" {% if not t.category %}selected{% endif %}>
+        Uncategorized
+      </option>
+
+      {% for value, display_name in categories %}
+        <option value="{{ value }}" {% if t.category == value %}selected{% endif %}>
+          {{ display_name }}
+        </option>
+      {% endfor %}
+    </select>
+
+  </form>
+</td>
         </tr>
       {% endfor %}
     </tbody>

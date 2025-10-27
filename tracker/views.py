@@ -3,11 +3,12 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
-from .models import Transaction
+from .models import Transaction, CATEGORY_CHOICES
 import pandas as pd  # This is the library for reading CSVs
 import io            # To handle the file in memory
 from .forms import CSVUploadForm
 from django.contrib import messages # To show success/error messages
+from django.shortcuts import get_object_or_404
 
 def register(request):
     """Register a new user."""
@@ -78,5 +79,36 @@ def dashboard(request):
     context = {
         'transactions': transactions,
         'form': form, # Add the form to the context
+        'categories': CATEGORY_CHOICES,
     }
     return render(request, 'tracker/dashboard.html', context)
+
+# tracker/views.py
+
+@login_required
+def update_category(request):
+    """View to handle updating a transaction's category."""
+
+    if request.method == 'POST':
+        try:
+            # Get the transaction ID and new category from the form
+            transaction_id = request.POST.get('transaction_id')
+            new_category = request.POST.get('category')
+
+            # Find the transaction
+            transaction = get_object_or_404(Transaction, id=transaction_id)
+
+            # --- SECURITY CHECK ---
+            # Make sure the transaction belongs to the logged-in user
+            if transaction.user == request.user:
+                transaction.category = new_category
+                transaction.save()
+                messages.success(request, 'Category updated!')
+            else:
+                messages.error(request, 'You do not have permission to edit this.')
+
+        except Exception as e:
+            messages.error(request, f'An error occurred: {e}')
+
+    # Redirect back to the dashboard
+    return redirect('dashboard')

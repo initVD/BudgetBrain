@@ -12,4 +12,6 @@ urlpatterns = [
     
     # Our new dashboard page
     path('dashboard/', views.dashboard, name='dashboard'),
+
+    path('update_category/', views.update_category, name='update_category'),
 ]
