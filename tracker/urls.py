@@ -9,4 +9,7 @@ urlpatterns = [
     
     # Our new registration page
     path('register/', views.register, name='register'),
+    
+    # Our new dashboard page
+    path('dashboard/', views.dashboard, name='dashboard'),
 ]

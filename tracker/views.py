@@ -1,6 +1,13 @@
+# tracker/views.py
 from django.shortcuts import render, redirect
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.decorators import login_required
+from .models import Transaction
+import pandas as pd  # This is the library for reading CSVs
+import io            # To handle the file in memory
+from .forms import CSVUploadForm
+from django.contrib import messages # To show success/error messages
 
 def register(request):
     """Register a new user."""
@@ -21,3 +28,55 @@ def register(request):
     # Send the form to the HTML template
     context = {'form': form}
     return render(request, 'tracker/register.html', context)
+
+
+@login_required
+def dashboard(request):
+    """The main dashboard page, now with file upload."""
+    
+    # Initialize the form
+    form = CSVUploadForm()
+    
+    if request.method == 'POST':
+        # This block handles the file upload
+        form = CSVUploadForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            csv_file = request.FILES['csv_file']
+            
+            # Check if it's a CSV file
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'This is not a CSV file.')
+            else:
+                try:
+                    # Read the CSV file in memory
+                    file_data = csv_file.read().decode('utf-8')
+                    csv_data = io.StringIO(file_data)
+                    
+                    # Use pandas to read the CSV
+                    df = pd.read_csv(csv_data)
+                    
+                    # IMPORTANT: Adjust these column names if your CSV is different
+                    # This assumes your CSV has columns named 'Date', 'Description', 'Amount'
+                    for index, row in df.iterrows():
+                        Transaction.objects.create(
+                            user=request.user,
+                            date=row['Date'],
+                            description=row['Description'],
+                            amount=row['Amount']
+                        )
+                    
+                    messages.success(request, 'File uploaded and transactions saved.')
+                    return redirect('dashboard') # Redirect to clear the form
+                
+                except Exception as e:
+                    messages.error(request, f'Error processing file: {e}')
+
+    # This part runs for both GET requests and if the POST form was invalid
+    transactions = Transaction.objects.filter(user=request.user).order_by('-date')
+    
+    context = {
+        'transactions': transactions,
+        'form': form, # Add the form to the context
+    }
+    return render(request, 'tracker/dashboard.html', context)
