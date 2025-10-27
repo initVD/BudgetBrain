@@ -1,0 +1,15 @@
+# Virtual Environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Django database
+db.sqlite3
+
+# IDE files (like .vscode)
+.vscode/
+
+# Environment variables (we will use this for secret keys later)
+.env
