@@ -15,5 +15,6 @@ urlpatterns = [
 
     path('update_category/', views.update_category, name='update_category'),
     path('chart_data/', views.spending_chart_data, name='spending_chart_data'),
-    path('bar_chart_data/', views.spending_bar_chart_data, name='spending_bar_chart_data')
+    path('bar_chart_data/', views.spending_bar_chart_data, name='spending_bar_chart_data'),
+    path('categories/', views.manage_categories, name='manage_categories'),
 ]

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<nav>
+  <ul>
+    <li><a href="{% url 'dashboard' %}">Back to Dashboard</a></li>
+  </ul>
+</nav>
+
+{% if messages %}
+  {% for message in messages %}
+    <article {% if message.tags == 'success' %}style="background-color: var(--pico-color-green-100);"
+             {% elif message.tags == 'error' %}style="background-color: var(--pico-color-red-100);"
+             {% endif %}>
+      {{ message }}
+    </article>
+  {% endfor %}
+{% endif %}
+
+<div class="grid">
+  <article>
+    <h3>Add a New Category</h3>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Save Category</button>
+    </form>
+  </article>
+
+  <article>
+    <h3>Your Categories</h3>
+    {% if categories %}
+      <ul>
+        {% for category in categories %}
+          <li>{{ category.name }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>You haven't added any categories yet.</p>
+    {% endif %}
+  </article>
+</div>
+
+{% endblock %}

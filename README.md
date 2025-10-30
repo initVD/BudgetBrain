@@ -109,3 +109,12 @@ This is a Django project I built from scratch to learn web development and AI. I
 
 * **Phase 1 Complete: PLATFORM**
     * Full user system, CSV upload, and manual categorization.
+## Project Status: Enhancements in Progress
+
+* **Phase 7, Step 3 Complete: Dashboard & AI Fixed**
+    * Updated dashboard to use the new `Category` model.
+    * Updated AI `train` and `predict` logic.
+    * Custom categories are fully functional.
+
+* **(Project Complete to Spec)**
+    * All original "BudgetBrain" features are working.
