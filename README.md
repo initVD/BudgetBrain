@@ -71,3 +71,16 @@ This is a Django project to create an AI-powered finance tracker. I am building 
     * User registration, login, and protected dashboard.
     * CSV file upload and parsing with Pandas.
     * Added row-by-row manual categorization.
+## Project Status
+
+* **Phase 3 Complete: AI "BRAIN" FINISHED**
+    * Installed `scikit-learn`.
+    * Built a separate `ai_engine.py` for training and prediction.
+    * Integrated the AI into the file upload logic.
+    * New transactions are now **auto-categorized** on upload.
+
+* **Phase 2 Complete:**
+    * Added `Chart.js` pie chart and `login.html`.
+
+* **Phase 1 Complete: PLATFORM FINISHED**
+    * Full user system, CSV upload, and manual categorization.

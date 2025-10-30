@@ -11,6 +11,7 @@ from django.contrib import messages # To show success/error messages
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Sum
+from .ai_engine import train_model, predict_category
 
 def register(request):
     """Register a new user."""
@@ -33,44 +34,64 @@ def register(request):
     return render(request, 'tracker/register.html', context)
 
 
+# tracker/views.py
+
 @login_required
 def dashboard(request):
-    """The main dashboard page, now with file upload."""
+    """The main dashboard page, now with file upload AND AI."""
     
-    # Initialize the form
     form = CSVUploadForm()
     
     if request.method == 'POST':
-        # This block handles the file upload
         form = CSVUploadForm(request.POST, request.FILES)
         
         if form.is_valid():
             csv_file = request.FILES['csv_file']
             
-            # Check if it's a CSV file
             if not csv_file.name.endswith('.csv'):
                 messages.error(request, 'This is not a CSV file.')
             else:
+                
+                # --- AI TRAINING STEP ---
+                # Try to train a model on the user's *existing* data
+                # We do this *before* processing the new file.
+                model, vectorizer = train_model(request.user)
+                if model:
+                    messages.info(request, 'AI "Brain" trained on your existing data.')
+                else:
+                    messages.info(request, 'Not enough data to train AI. Categories will be blank.')
+                # --- END AI TRAINING ---
+                
                 try:
-                    # Read the CSV file in memory
                     file_data = csv_file.read().decode('utf-8')
                     csv_data = io.StringIO(file_data)
-                    
-                    # Use pandas to read the CSV
                     df = pd.read_csv(csv_data)
                     
-                    # IMPORTANT: Adjust these column names if your CSV is different
-                    # This assumes your CSV has columns named 'Date', 'Description', 'Amount'
+                    transactions_saved = 0
                     for index, row in df.iterrows():
+                        
+                        # --- AI PREDICTION STEP ---
+                        predicted_category = None # Default
+                        if model and vectorizer:
+                            try:
+                                # Use the AI to predict
+                                predicted_category = predict_category(model, vectorizer, row['Description'])
+                            except:
+                                # If prediction fails, just leave it blank
+                                predicted_category = None
+                        # --- END AI PREDICTION ---
+                        
                         Transaction.objects.create(
                             user=request.user,
                             date=row['Date'],
                             description=row['Description'],
-                            amount=row['Amount']
+                            amount=row['Amount'],
+                            category=predicted_category # <-- SAVE THE PREDICTION!
                         )
+                        transactions_saved += 1
                     
-                    messages.success(request, 'File uploaded and transactions saved.')
-                    return redirect('dashboard') # Redirect to clear the form
+                    messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
+                    return redirect('dashboard')
                 
                 except Exception as e:
                     messages.error(request, f'Error processing file: {e}')
@@ -80,11 +101,10 @@ def dashboard(request):
     
     context = {
         'transactions': transactions,
-        'form': form, # Add the form to the context
+        'form': form,
         'categories': CATEGORY_CHOICES,
     }
     return render(request, 'tracker/dashboard.html', context)
-
 # tracker/views.py
 
 # tracker/views.py
