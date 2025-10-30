@@ -1,7 +1,18 @@
-<h2>Sign Up</h2>
+{% extends 'base.html' %}
 
-<form method="post" novalidate>
-  {% csrf_token %} {{ form.as_p }} <button type="submit">Sign Up</button>
-</form>
+{% block content %}
+  <article>
+    <hgroup>
+      <h2>Sign Up</h2>
+      <h3>Create your private BudgetBrain account</h3>
+    </hgroup>
 
-<p>Already have an account? <a href="{% url 'login' %}">Log In</a></p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Sign Up</button>
+    </form>
+
+    <p>Already have an account? <a href="{% url 'login' %}">Log In</a></p>
+  </article>
+{% endblock %}

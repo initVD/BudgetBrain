@@ -1,119 +1,182 @@
-<h2>Welcome, {{ user.username }}!</h2>
+{% extends 'base.html' %}
 
-{% if messages %}
-  <ul class="messages">
+{% block content %}
+  <nav>
+    <ul>
+      <li><strong>Welcome, {{ user.username }}!</strong></li>
+    </ul>
+    <ul>
+      <li>
+        <form action="{% url 'logout' %}" method="post" style="margin: 0;">
+          {% csrf_token %}
+          <button type="submit" class="secondary outline">Log Out</button>
+        </form>
+      </li>
+    </ul>
+  </nav>
+
+  {% if messages %}
     {% for message in messages %}
-      <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+      <article {% if message.tags == 'success' %}style="background-color: var(--pico-color-green-100);"
+               {% elif message.tags == 'error' %}style="background-color: var(--pico-color-red-100);"
+               {% endif %}>
+        {{ message }}
+      </article>
     {% endfor %}
-  </ul>
-{% endif %}
+  {% endif %}
 
-<p>This is your BudgetBrain dashboard.</p>
+  {% if alerts %}
+    <article style="background-color: var(--pico-color-amber-100);">
+      <hgroup>
+        <h4 style="color: var(--pico-color-amber-700);">Spending Alerts!</h4>
+        <p>We noticed some unusual activity in your spending:</p>
+      </hgroup>
+      <ul>
+        {% for alert in alerts %}
+          <li><strong>{{ alert }}</strong></li>
+        {% endfor %}
+      </ul>
+    </article>
+  {% endif %}
+  <hr>
 
-<form action="{% url 'logout' %}" method="post">
-  {% csrf_token %}
-  <button type="submit">Log Out</button>
-</form>
+  <div class="grid">
+    
+    <article>
+      <hgroup>
+        <h3>Spending by Category</h3>
+        <p>Where your money went.</p>
+      </hgroup>
+      <div style="max-width: 400px; margin: auto;">
+        <canvas id="spendingPieChart"></canvas>
+      </div>
+    </article>
+    
+    <article>
+      <hgroup>
+        <h3>Spending Over Time</h3>
+        <p>When you spent your money.</p>
+      </hgroup>
+      <div>
+        <canvas id="spendingBarChart"></canvas>
+      </div>
+    </article>
+  
+  </div> <article>
+    <h3>Upload Your Bank Statement (CSV)</h3>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Upload</button>
+    </form>
+  </article>
 
-<hr>
+  <article>
+    <h3>Your Transactions</h3>
+    <figure>
+      <table role="grid">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Description</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+            <tr>
+              <td>{{ t.date }}</td>
+              <td>{{ t.description }}</td>
+              <td>${{ t.amount }}</td>
+              <td>
+                <form action="{% url 'update_category' %}" method="post" style="margin: 0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="transaction_id" value="{{ t.id }}">
+                  <select name="category" onchange="this.form.submit()">
+                    <option value="" {% if not t.category %}selected{% endif %}>Uncategorized</option>
+                    {% for value, display_name in categories %}
+                      <option value="{{ value }}" {% if t.category == value %}selected{% endif %}>
+                        {{ display_name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">No transactions yet. Upload a file to get started!</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </figure>
+  </article>
 
-<div style="width: 50%; margin: auto;">
-  <h3>Spending by Category</h3>
-  <canvas id="spendingPieChart"></canvas>
-</div>
+{% endblock %}
 
-<hr>
 
-<h3>Upload Your Bank Statement (CSV)</h3>
-<form method="post" enctype="multipart/form-data">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Upload</button>
-</form>
-<hr>
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<h3>Your Transactions</h3>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // --- 1. Pie Chart ---
+      const ctxPie = document.getElementById('spendingPieChart').getContext('2d');
+      if (ctxPie) { // Check if the element exists
+        fetch("{% url 'spending_chart_data' %}")
+          .then(response => response.json())
+          .then(data => {
+            new Chart(ctxPie, {
+              type: 'pie',
+              data: {
+                labels: data.labels,
+                datasets: [{
+                  label: 'Spending by Category',
+                  data: data.data,
+                  backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#E7E9ED', '#800080', '#008080', '#FFC0CB'
+                  ],
+                }]
+              },
+              options: {
+                responsive: true,
+              }
+            });
+          });
+      }
 
-{% if transactions %}
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Description</th>
-        <th>Amount</th>
-        <th>Category</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in transactions %}
-        <tr>
-          <td>{{ t.date }}</td>
-          <td>{{ t.description }}</td>
-          <td>${{ t.amount }}</td>
-          <td>
-  <form action="{% url 'update_category' %}" method="post" style="margin: 0;">
-    {% csrf_token %}
+      // --- 2. Bar Chart ---
+      const ctxBar = document.getElementById('spendingBarChart').getContext('2d');
+      if (ctxBar) { // Check if the element exists
+        fetch("{% url 'spending_bar_chart_data' %}")
+          .then(response => response.json())
+          .then(data => {
+            new Chart(ctxBar, {
+              type: 'bar',
+              data: {
+                labels: data.labels, // The dates
+                datasets: [{
+                  label: 'Total Spending',
+                  data: data.data, // The spending amounts
+                  backgroundColor: '#36A2EB',
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: {
+                  y: {
+                    beginAtZero: true
+                  } // <-- This is the corrected section
+                }
+              }
+            });
+          });
+      }
 
-    <input type="hidden" name="transaction_id" value="{{ t.id }}">
-
-    <select name="category" onchange="this.form.submit()">
-
-      <option value="" {% if not t.category %}selected{% endif %}>
-        Uncategorized
-      </option>
-
-      {% for value, display_name in categories %}
-        <option value="{{ value }}" {% if t.category == value %}selected{% endif %}>
-          {{ display_name }}
-        </option>
-      {% endfor %}
-    </select>
-
-  </form>
-</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>You have no transactions yet. Let's upload a file!</p>
-{% endif %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-  // This code runs after the page is loaded
-  document.addEventListener('DOMContentLoaded', function() {
-
-    // 1. Get the 'canvas' element
-    const ctx = document.getElementById('spendingPieChart').getContext('2d');
-
-    // 2. Fetch the data from our new URL
-    fetch("{% url 'spending_chart_data' %}")
-      .then(response => response.json())
-      .then(data => {
-
-        // 3. Create the chart
-        new Chart(ctx, {
-          type: 'pie', // We want a pie chart
-          data: {
-            labels: data.labels, // The category names
-            datasets: [{
-              label: 'Spending by Category',
-              data: data.data, // The spending amounts
-              backgroundColor: [ // Some random nice colors
-                '#FF6384',
-                '#36A2EB',
-                '#FFCE56',
-                '#4BC0C0',
-                '#9966FF',
-                '#FF9F40'
-              ],
-            }]
-          },
-          options: {
-            responsive: true,
-          }
-        });
-      });
-  });
-</script>
+    });
+  </script>
+{% endblock %}

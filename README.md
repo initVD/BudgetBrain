@@ -84,3 +84,28 @@ This is a Django project to create an AI-powered finance tracker. I am building 
 
 * **Phase 1 Complete: PLATFORM FINISHED**
     * Full user system, CSV upload, and manual categorization.
+
+# BudgetBrain: The AI-Powered Finance Tracker
+
+This is a Django project I built from scratch to learn web development and AI. It's a fully functional, secure web app that can upload bank statements, auto-categorize transactions using AI, visualize spending, and alert the user to unusual activity.
+
+## Project Status: COMPLETE
+
+* **Phase 6 Complete: Anomaly Detection**
+    * Added logic to detect unusual spending compared to the monthly average.
+    * The dashboard now shows alerts for anomalies.
+
+* **Phase 5 Complete: Added Bar Chart**
+    * Added a "Spending Over Time" bar chart.
+
+* **Phase 4 Complete: Styling**
+    * Added Pico.css and a `base.html` for a professional UI.
+
+* **Phase 3 Complete: AI "BRAIN"**
+    * New transactions are now auto-categorized.
+
+* **Phase 2 Complete: Charts & Login**
+    * Added `Chart.js` pie chart and `login.html`.
+
+* **Phase 1 Complete: PLATFORM**
+    * Full user system, CSV upload, and manual categorization.

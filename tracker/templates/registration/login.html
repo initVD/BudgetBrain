@@ -1,13 +1,22 @@
-<h2>Log In</h2>
+{% extends 'base.html' %}
 
-{% if form.errors %}
-  <p style="color: red;">Your username and password didn't match. Please try again.</p>
-{% endif %}
+{% block content %}
+  <article>
+    <hgroup>
+      <h2>Log In</h2>
+      <h3>Welcome back to BudgetBrain</h3>
+    </hgroup>
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Log In</button>
-</form>
+    {% if form.errors %}
+      <p style="color: var(--pico-color-red-500);">Your username and password didn't match. Please try again.</p>
+    {% endif %}
 
-<p>Don't have an account? <a href="{% url 'register' %}">Sign Up</a></p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Log In</button>
+    </form>
+
+    <p>Don't have an account? <a href="{% url 'register' %}">Sign Up</a></p>
+  </article>
+{% endblock %}
