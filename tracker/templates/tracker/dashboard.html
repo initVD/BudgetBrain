@@ -17,6 +17,13 @@
 
 <hr>
 
+<div style="width: 50%; margin: auto;">
+  <h3>Spending by Category</h3>
+  <canvas id="spendingPieChart"></canvas>
+</div>
+
+<hr>
+
 <h3>Upload Your Bank Statement (CSV)</h3>
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
@@ -71,3 +78,42 @@
 {% else %}
   <p>You have no transactions yet. Let's upload a file!</p>
 {% endif %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  // This code runs after the page is loaded
+  document.addEventListener('DOMContentLoaded', function() {
+
+    // 1. Get the 'canvas' element
+    const ctx = document.getElementById('spendingPieChart').getContext('2d');
+
+    // 2. Fetch the data from our new URL
+    fetch("{% url 'spending_chart_data' %}")
+      .then(response => response.json())
+      .then(data => {
+
+        // 3. Create the chart
+        new Chart(ctx, {
+          type: 'pie', // We want a pie chart
+          data: {
+            labels: data.labels, // The category names
+            datasets: [{
+              label: 'Spending by Category',
+              data: data.data, // The spending amounts
+              backgroundColor: [ // Some random nice colors
+                '#FF6384',
+                '#36A2EB',
+                '#FFCE56',
+                '#4BC0C0',
+                '#9966FF',
+                '#FF9F40'
+              ],
+            }]
+          },
+          options: {
+            responsive: true,
+          }
+        });
+      });
+  });
+</script>

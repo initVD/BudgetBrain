@@ -9,6 +9,8 @@ import io            # To handle the file in memory
 from .forms import CSVUploadForm
 from django.contrib import messages # To show success/error messages
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.db.models import Sum
 
 def register(request):
     """Register a new user."""
@@ -109,6 +111,36 @@ def update_category(request):
 
         except Exception as e:
             messages.error(request, f'An error occurred: {e}')
+# tracker/views.py
+
+@login_required
+def spending_chart_data(request):
+    """View to provide data for the spending pie chart."""
+
+    # Get all transactions for the user
+    user_transactions = Transaction.objects.filter(user=request.user)
+
+    # Group by category and sum the amounts
+    # This creates a list of dictionaries, e.g.:
+    # [{'category': 'Groceries', 'total_amount': 85.20}, ...]
+    category_spending = user_transactions.values('category').annotate(
+        total_amount=Sum('amount')
+    ).order_by('-total_amount')
+
+    # Format the data for Chart.js
+    labels = []
+    data = []
+
+    for item in category_spending:
+        # Use 'Uncategorized' if category is None or empty
+        category_name = item['category'] if item['category'] else 'Uncategorized'
+        labels.append(category_name)
+        data.append(float(item['total_amount'])) # Convert Decimal to float for JSON
+
+    return JsonResponse({
+        'labels': labels,
+        'data': data,
+    })
 
     # Redirect back to the dashboard
     return redirect('dashboard')

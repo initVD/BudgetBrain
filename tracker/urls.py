@@ -14,4 +14,5 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
 
     path('update_category/', views.update_category, name='update_category'),
+    path('chart_data/', views.spending_chart_data, name='spending_chart_data'),
 ]
