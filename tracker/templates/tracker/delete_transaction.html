@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <article>
+    <hgroup>
+      <h2>Delete Transaction?</h2>
+      <h3>Are you sure you want to permanently delete this transaction?</h3>
+    </hgroup>
+    
+    <p>
+      <strong>Date:</strong> {{ transaction.date }}<br>
+      <strong>Description:</strong> {{ transaction.description }}<br>
+      <strong>Amount:</strong> ${{ transaction.amount }}<br>
+      <strong>Category:</strong> {{ transaction.category.name|default:'Uncategorized' }}
+    </p>
+
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="grid">
+        <a href="{% url 'dashboard' %}" role="button" class="secondary">Cancel</a>
+        
+        <button type="submit" class="contrast">Confirm Delete</button>
+      </div>
+    </form>
+    
+  </article>
+{% endblock %}

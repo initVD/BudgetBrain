@@ -63,14 +63,28 @@
       </div>
     </article>
   
-  </div> <article>
+  </div> 
+  <div class="grid">
+
+  <article>
+    <h3>Add Transaction</h3>
+    <form method="post">
+      {% csrf_token %}
+      {{ manual_form.as_p }}
+      <button type="submit" name="manual_submit">Save Transaction</button>
+    </form>
+  </article>
+
+  <article>
     <h3>Upload Your Bank Statement (CSV)</h3>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit">Upload</button>
+      {{ upload_form.as_p }}
+      <button type="submit" name="csv_submit">Upload</button>
     </form>
   </article>
+
+</div>
 
   <article>
     <h3>Your Transactions</h3>
@@ -82,6 +96,7 @@
             <th scope="col">Description</th>
             <th scope="col">Amount</th>
             <th scope="col">Category</th>
+            <th scope="col" style="width: 20%;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -95,20 +110,30 @@
                   {% csrf_token %}
                   <input type="hidden" name="transaction_id" value="{{ t.id }}">
                   <select name="category" onchange="this.form.submit()">
-  <option value="">Uncategorized</option>
-
-  {% for category in categories %}
-    <option value="{{ category.id }}" {% if t.category.id == category.id %}selected{% endif %}>
-      {{ category.name }}
-    </option>
-  {% endfor %}
-</select>
+                    <option value="">Uncategorized</option>
+                    {% for category in categories %}
+                      <option value="{{ category.id }}" {% if t.category.id == category.id %}selected{% endif %}>
+                        {{ category.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
                 </form>
+              </td>
+              
+              <td>
+                <div class="grid" style="margin: 0; padding: 0;">
+                  <a href="{% url 'edit_transaction' t.id %}" role="button" class="outline" style="padding: 5px 10px;">
+                    Edit
+                  </a>
+                  <a href="{% url 'delete_transaction' t.id %}" role="button" class="contrast outline" style="padding: 5px 10px;">
+                    Delete
+                  </a>
+                </div>
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="4">No transactions yet. Upload a file to get started!</td>
+              <td colspan="5">No transactions yet. Upload a file to get started!</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -172,7 +197,7 @@
                 scales: {
                   y: {
                     beginAtZero: true
-                  } // <-- This is the corrected section
+                  }
                 }
               }
             });

@@ -8,7 +8,8 @@ from django.contrib import messages
 import pandas as pd
 import io
 from datetime import datetime
-
+# tracker/views.py (at the top)
+from .forms import CSVUploadForm, CategoryForm, TransactionForm
 from .models import Transaction, Category
 from .forms import CSVUploadForm, CategoryForm
 from .ai_engine import train_model, predict_category
@@ -31,27 +32,26 @@ def register(request):
 
 # --- Main Dashboard View ---
 
+# tracker/views.py
+
 @login_required
 def dashboard(request):
     """The main dashboard page, with file upload, AI, and anomaly detection."""
-    
-    # --- ANOMALY DETECTION LOGIC ---
+
+    # --- ANOMALY DETECTION LOGIC (No changes here) ---
     alerts = []
     try:
         transactions = Transaction.objects.filter(user=request.user)
-        
         if transactions.count() > 0:
-            # We must get the category *name* using the ForeignKey relationship
             df = pd.DataFrame(list(transactions.values('date', 'category__name', 'amount')))
             df['date'] = pd.to_datetime(df['date'])
             df['amount'] = pd.to_numeric(df['amount'])
-            # Rename 'category__name' to 'category' for pandas processing
             df.rename(columns={'category__name': 'category'}, inplace=True)
-            
+
             now = datetime.now()
             current_month = now.month
             current_year = now.year
-            
+
             current_month_df = df[
                 (df['date'].dt.month == current_month) & (df['date'].dt.year == current_year)
             ]
@@ -60,14 +60,12 @@ def dashboard(request):
             past_months_df = df[
                 (df['date'].dt.month != current_month) | (df['date'].dt.year != current_year)
             ]
-            
+
             if not past_months_df.empty:
                 monthly_spending = past_months_df.groupby(
                     [past_months_df['date'].dt.to_period('M'), 'category']
                 )['amount'].sum().reset_index()
-                
                 average_spending = monthly_spending.groupby('category')['amount'].mean()
-
                 for category, current_total in current_spending.items():
                     if category in average_spending:
                         average = average_spending[category]
@@ -80,75 +78,79 @@ def dashboard(request):
         alerts.append(f"Could not check for anomalies: {e}")
     # --- END ANOMALY DETECTION ---
 
+    # --- NEW DUAL-FORM HANDLING ---
 
-    # --- File Upload Logic (starts here) ---
-    form = CSVUploadForm()
+    # We need to check which form was submitted.
     if request.method == 'POST':
-        form = CSVUploadForm(request.POST, request.FILES)
-        
-        if form.is_valid():
-            csv_file = request.FILES['csv_file']
-            
-            if not csv_file.name.endswith('.csv'):
-                messages.error(request, 'This is not a CSV file.')
-            else:
-                
-                # --- AI TRAINING STEP ---
-                model, vectorizer = train_model(request.user)
-                if model:
-                    messages.info(request, 'AI "Brain" trained on your existing data.')
-                else:
-                    messages.info(request, 'Not enough data to train AI. Categories will be blank.')
-                
-                try:
-                    file_data = csv_file.read().decode('utf-8')
-                    csv_data = io.StringIO(file_data)
-                    df = pd.read_csv(csv_data)
-                    
-                    transactions_saved = 0
-                    for index, row in df.iterrows():
-                        
-                        # --- AI PREDICTION STEP (Updated for new model) ---
-                        predicted_category_obj = None 
-                        if model and vectorizer:
-                            try:
-                                # 1. AI predicts the *name*
-                                predicted_name = predict_category(model, vectorizer, row['Description'])
-                                # 2. We find the matching *Category object* for this user
-                                predicted_category_obj = Category.objects.get(user=request.user, name=predicted_name)
-                            except:
-                                predicted_category_obj = None # AI failed or category doesn't exist
-                        
-                        Transaction.objects.create(
-                            user=request.user,
-                            date=row['Date'],
-                            description=row['Description'],
-                            amount=row['Amount'],
-                            category=predicted_category_obj # Save the object (or None)
-                        )
-                        transactions_saved += 1
-                    
-                    messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
-                    return redirect('dashboard') 
-                
-                except Exception as e:
-                    messages.error(request, f'Error processing file: {e}')
-    # --- END FILE UPLOAD ---
 
+        # Check if the 'csv_submit' button was pressed
+        if 'csv_submit' in request.POST:
+            upload_form = CSVUploadForm(request.POST, request.FILES)
+            manual_form = TransactionForm(user=request.user) # Keep a blank manual form
+
+            if upload_form.is_valid():
+                # ... (This is all your existing CSV/AI logic) ...
+                csv_file = request.FILES['csv_file']
+                if not csv_file.name.endswith('.csv'):
+                    messages.error(request, 'This is not a CSV file.')
+                else:
+                    model, vectorizer = train_model(request.user)
+                    # ... (rest of CSV/AI logic) ...
+                    try:
+                        file_data = csv_file.read().decode('utf-8')
+                        csv_data = io.StringIO(file_data)
+                        df = pd.read_csv(csv_data)
+                        transactions_saved = 0
+                        for index, row in df.iterrows():
+                            predicted_category_obj = None 
+                            if model and vectorizer:
+                                try:
+                                    predicted_name = predict_category(model, vectorizer, row['Description'])
+                                    predicted_category_obj = Category.objects.get(user=request.user, name=predicted_name)
+                                except:
+                                    predicted_category_obj = None
+                            Transaction.objects.create(
+                                user=request.user, date=row['Date'], description=row['Description'],
+                                amount=row['Amount'], category=predicted_category_obj
+                            )
+                            transactions_saved += 1
+                        messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
+                    except Exception as e:
+                        messages.error(request, f'Error processing file: {e}')
+                return redirect('dashboard') 
+
+        # Check if the 'manual_submit' button was pressed
+        elif 'manual_submit' in request.POST:
+            manual_form = TransactionForm(request.POST, user=request.user)
+            upload_form = CSVUploadForm() # Keep a blank upload form
+
+            if manual_form.is_valid():
+                # Save the new transaction, but link it to the user first
+                transaction = manual_form.save(commit=False)
+                transaction.user = request.user
+                transaction.save()
+                messages.success(request, 'Transaction added!')
+                return redirect('dashboard')
+
+    else:
+        # This is a GET request, so show blank forms
+        upload_form = CSVUploadForm()
+        manual_form = TransactionForm(user=request.user)
+    # --- END DUAL-FORM HANDLING ---
 
     # --- Context (to send data to template) ---
     all_transactions = Transaction.objects.filter(user=request.user).order_by('-date')
     user_categories = Category.objects.filter(user=request.user)
-    
+
     context = {
         'transactions': all_transactions,
-        'form': form,
+        'upload_form': upload_form, # <-- Renamed
+        'manual_form': manual_form, # <-- New
         'categories': user_categories,
         'alerts': alerts,
     }
     return render(request, 'tracker/dashboard.html', context)
-
-# --- Category Management Views ---
+# --- Category & Transaction Management Views ---
 
 @login_required
 def manage_categories(request):
@@ -203,6 +205,51 @@ def update_category(request):
             messages.error(request, f'An error occurred: {e}')
             
     return redirect('dashboard')
+
+# --- THIS IS THE NEW VIEW ---
+@login_required
+def delete_transaction(request, pk):
+    """Deletes a single transaction."""
+    
+    # Find the transaction by its ID (pk) and make sure it belongs to the user
+    transaction = get_object_or_404(Transaction, id=pk, user=request.user)
+    
+    if request.method == 'POST':
+        # If the form is submitted, delete the object
+        transaction.delete()
+        messages.success(request, 'Transaction deleted.')
+        return redirect('dashboard')
+    
+    # If it's a GET request, just show a confirmation page
+    context = {
+        'transaction': transaction
+    }
+    return render(request, 'tracker/delete_transaction.html', context)
+# tracker/views.py
+
+@login_required
+def edit_transaction(request, pk):
+    """Edits a single transaction."""
+
+    # Find the transaction by its ID (pk) and make sure it belongs to the user
+    transaction = get_object_or_404(Transaction, id=pk, user=request.user)
+
+    if request.method == 'POST':
+        # User is submitting changes
+        form = TransactionForm(request.POST, instance=transaction)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Transaction updated!')
+            return redirect('dashboard')
+    else:
+        # User is just visiting the page, show the pre-filled form
+        form = TransactionForm(instance=transaction)
+
+    context = {
+        'form': form,
+        'transaction': transaction
+    }
+    return render(request, 'tracker/edit_transaction.html', context)
 
 # --- Chart Data Views (JSON) ---
 

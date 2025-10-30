@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <article>
+    <hgroup>
+      <h2>Edit Transaction</h2>
+      <h3>Make changes to your transaction and save.</h3>
+    </hgroup>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+
+      <div class="grid">
+        <a href="{% url 'dashboard' %}" role="button" class="secondary">Cancel</a>
+        <button type="submit">Save Changes</button>
+      </div>
+    </form>
+
+  </article>
+{% endblock %}

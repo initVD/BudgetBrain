@@ -118,3 +118,16 @@ This is a Django project I built from scratch to learn web development and AI. I
 
 * **(Project Complete to Spec)**
     * All original "BudgetBrain" features are working.
+
+## Project Status: Enhancements in Progress
+
+* **Phase 8 Complete: Full CRUD**
+    * Added "Delete" button and view.
+    * Added "Edit" button and view.
+    * Added "Manual Transaction" form to the dashboard.
+
+* **Phase 7 Complete: Custom Categories**
+    * Database rebuilt to support user-created categories.
+
+* **(Project Complete to Spec)**
+    * All original "BudgetBrain" features are working.
