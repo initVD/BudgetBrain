@@ -87,19 +87,21 @@ def dashboard(request):
 
 # tracker/views.py
 
+# tracker/views.py
+
 @login_required
 def update_category(request):
     """View to handle updating a transaction's category."""
-
+    
     if request.method == 'POST':
         try:
             # Get the transaction ID and new category from the form
             transaction_id = request.POST.get('transaction_id')
             new_category = request.POST.get('category')
-
+            
             # Find the transaction
             transaction = get_object_or_404(Transaction, id=transaction_id)
-
+            
             # --- SECURITY CHECK ---
             # Make sure the transaction belongs to the logged-in user
             if transaction.user == request.user:
@@ -108,9 +110,14 @@ def update_category(request):
                 messages.success(request, 'Category updated!')
             else:
                 messages.error(request, 'You do not have permission to edit this.')
-
+                
         except Exception as e:
             messages.error(request, f'An error occurred: {e}')
+            
+    # --- THIS IS THE FIX ---
+    # This line MUST be outside the 'if' block.
+    # It should be the very last line of the function.
+    return redirect('dashboard')
 # tracker/views.py
 
 @login_required

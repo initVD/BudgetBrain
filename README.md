@@ -60,3 +60,14 @@ This is a Django project to create an AI-powered finance tracker. I am building 
     * User registration, login, and protected dashboard.
     * CSV file upload and parsing with Pandas.
     * Added row-by-row manual categorization.
+## Project Status
+
+* **Phase 2 Complete:**
+    * Added `Chart.js` pie chart for "Spending by Category".
+    * Built a JSON data endpoint to power the chart.
+    * Created the `login.html` template and fixed `update_category` view.
+
+* **Phase 1 Complete: PLATFORM FINISHED**
+    * User registration, login, and protected dashboard.
+    * CSV file upload and parsing with Pandas.
+    * Added row-by-row manual categorization.
