@@ -131,3 +131,14 @@ This is a Django project I built from scratch to learn web development and AI. I
 
 * **(Project Complete to Spec)**
     * All original "BudgetBrain" features are working.
+
+# BudgetBrain V2.0: The AI-Powered Finance Tracker
+
+This is a Django project I built from scratch to learn web development and AI. It's a fully functional, secure web app that can upload bank statements, auto-categorize transactions, visualize spending, and alert the user to unusual activity.
+
+## Project Status: V2.0 Complete (with Styling)
+
+* **Final Polish:** Added custom CSS for shadows, hover effects, and glowing text.
+* **Powerful AI:** App is pre-trained on a 24,000-line dataset and can fine-tune on user data.
+* **Full CRUD:** All transactions are fully editable (Create, Read, Update, Delete).
+* **Dashboard 2.0:** Tracks Income vs. Expense with summary cards and charts.
