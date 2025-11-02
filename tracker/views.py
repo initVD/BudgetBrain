@@ -95,7 +95,8 @@ def dashboard(request):
                     messages.error(request, 'This is not a CSV file.')
                 else:
                     
-                    models = train_models(request.user) 
+                    # --- BUG #3 (FIXED): Must get models AND accuracies ---
+                    models, accuracies = train_models(request.user) 
                     if not models:
                         models = PRE_TRAINED_MODELS
                     
@@ -109,11 +110,21 @@ def dashboard(request):
                         csv_data = io.StringIO(file_data)
                         df = pd.read_csv(csv_data)
                         
+                        # --- Smart Column Detection ---
+                        if 'Transaction Description' in df.columns:
+                            desc_col = 'Transaction Description'
+                            amt_col = 'Amount ($)'
+                        elif 'Description' in df.columns:
+                            desc_col = 'Description'
+                            amt_col = 'Amount'
+                        else:
+                            raise KeyError("CSV must have 'Description'/'Amount' OR 'Transaction Description'/'Amount ($)' columns.")
+                        
                         transactions_saved = 0
                         for index, row in df.iterrows():
                             
-                            description = row['Transaction Description']
-                            amount = abs(pd.to_numeric(row['Amount ($)'])) 
+                            description = str(row[desc_col])
+                            amount = abs(pd.to_numeric(row[amt_col])) 
                             
                             predicted_type = 'Expense' 
                             predicted_category_obj = None
@@ -131,18 +142,15 @@ def dashboard(request):
                             if predicted_type == 'Expense':
                                 amount = -amount
                             
-                            # --- THIS IS THE FIX ---
+                            # --- Handle missing 'Date' column ---
                             try:
-                                # Try to find a 'Date' column
                                 transaction_date = pd.to_datetime(row['Date'])
                             except KeyError:
-                                # If 'Date' column doesn't exist, use today's date
                                 transaction_date = datetime.now().date()
-                            # --- END OF FIX ---
                             
                             Transaction.objects.create(
                                 user=request.user,
-                                date=transaction_date, # <-- Use our new, safe variable
+                                date=transaction_date, 
                                 description=description,
                                 amount=amount,
                                 category=predicted_category_obj
@@ -150,11 +158,8 @@ def dashboard(request):
                             transactions_saved += 1
                         
                         messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
-                    
-                    except KeyError:
-                        # --- THIS IS THE SECOND FIX ---
-                        # Updated the error message
-                        messages.error(request, "Error: The CSV file must have columns named 'Transaction Description' and 'Amount ($)'.")
+                    except KeyError as e:
+                        messages.error(request, f"Column error: {e}")
                     except Exception as e:
                         messages.error(request, f'Error processing file: {e}')
                 return redirect('dashboard') 
@@ -245,11 +250,19 @@ def update_all_categories(request):
                 except Exception as e:
                     messages.error(request, f"Could not update transaction {transaction_id}: {e}")
         messages.success(request, 'All changes saved!')
+        
+        # --- Retrain and report accuracy ---
         try:
-            train_models(request.user) 
-            messages.info(request, 'AI "Brain" has been retrained with your changes.')
+            models, accuracies = train_models(request.user) 
+            if models:
+                type_acc_str = f"{accuracies['type_accuracy'] * 100:.0f}%"
+                cat_acc_str = f"{accuracies['cat_accuracy'] * 100:.0f}%"
+                messages.info(request, f'AI "Brain" retrained! New accuracy: Type ({type_acc_str}), Category ({cat_acc_str})')
+            else:
+                messages.warning(request, 'AI could not be retrained (not enough data).')
         except:
             messages.warning(request, 'AI could not be retrained.')
+            
     return redirect('dashboard')
 
 @login_required
@@ -293,15 +306,22 @@ def edit_transaction(request, pk):
 
 @login_required
 def retrain_ai(request):
+    """
+    Manually triggers the AI to retrain and reports its accuracy.
+    """
     if request.method == 'POST':
         try:
-            models = train_models(request.user) 
+            models, accuracies = train_models(request.user) 
+            
             if models: 
-                messages.success(request, 'AI "Brain" has been retrained on all your data!')
+                type_acc_str = f"{accuracies['type_accuracy'] * 100:.0f}%"
+                cat_acc_str = f"{accuracies['cat_accuracy'] * 100:.0f}%"
+                messages.success(request, f'AI "Brain" has been retrained! New accuracy: Type ({type_acc_str}), Category ({cat_acc_str})')
             else:
-                messages.warning(request, 'Not enough data to train the AI. Categorize more transactions first.')
+                messages.warning(request, 'Not enough data to train the AI. Categorize at least 5 transactions first.')
         except Exception as e:
             messages.error(request, f'An error occurred during retraining: {e}')
+            
     return redirect('manage_categories')
 
 # --- Chart Data Views (JSON) ---

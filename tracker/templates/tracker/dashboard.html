@@ -43,31 +43,29 @@
   <hr>
 
   <div class="grid">
-  <article>
-    <hgroup>
-      <h4>Total Income</h4>
-      <h3 class="glow-green" style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
-    </hgroup>
-  </article>
-
-  <article>
-    <hgroup>
-      <h4>Total Expenses</h4>
-      <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
-    </hgroup>
-  </article>
-
-  <article>
-    <hgroup>
-      <h4>Net Balance</h4>
-      {% if net_balance >= 0 %}
-        <h3 class="glow-green" style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
-      {% else %}
-        <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
-      {% endif %}
-    </hgroup>
-  </article>
-</div>
+    <article>
+      <hgroup>
+        <h4>Total Income</h4>
+        <h3 style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
+      </hgroup>
+    </article>
+    <article>
+      <hgroup>
+        <h4>Total Expenses</h4>
+        <h3 style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
+      </hgroup>
+    </article>
+    <article>
+      <hgroup>
+        <h4>Net Balance</h4>
+        {% if net_balance >= 0 %}
+          <h3 style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
+        {% else %}
+          <h3 style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
+        {% endif %}
+      </hgroup>
+    </article>
+  </div>
   <div class="grid">
     <article>
       <hgroup>
@@ -165,10 +163,11 @@
       </figure>
     </form> <hr>
     <a href="{% url 'delete_all_transactions' %}" 
-      role="button" 
-      class="contrast btn-delete-all" style="background-color: var(--pico-color-red-600); border-color: var(--pico-color-red-600);">
-      Delete All Transactions
-  </a>
+       role="button" 
+       class="contrast" 
+       style="background-color: var(--pico-color-red-600); border-color: var(--pico-color-red-600);">
+       Delete All Transactions
+    </a>
   </article>
 {% endblock %}
 
