@@ -129,3 +129,10 @@ LOGIN_URL = 'login'
 
 # URL to redirect to after a successful login
 LOGIN_REDIRECT_URL = 'dashboard'
+
+# settings.py (at the very bottom)
+
+# This tells Django where to find our new 'static' folder
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]

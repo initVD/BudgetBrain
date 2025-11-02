@@ -1,0 +1,44 @@
+/* static/css/main.css */
+
+/* --- Card Hover Effect (Floating Glow) --- */
+article {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid var(--pico-card-border-color);
+}
+
+article:hover {
+  transform: translateY(-5px);
+
+  /* THIS IS THE GLOW: 
+     A blueish shadow. You can change the color.
+     '#36A2EB' is the blue from our bar chart.
+     '80' at the end adds 50% transparency.
+  */
+  box-shadow: 0 0 25px #36a2eb80;
+  border-color: #36A2EB;
+}
+
+/* --- Button Hover Effect (Grow) --- */
+button:hover,
+a[role="button"]:hover {
+  transform: scale(1.03);
+  transition: transform 0.2s ease;
+}
+
+/* --- Summary Card Text Glow (Permanent) --- */
+/* format: h-offset v-offset blur-radius color */
+
+.glow-green {
+  text-shadow: 0 0 12px var(--pico-color-green-500);
+}
+
+.glow-red {
+  text-shadow: 0 0 12px var(--pico-color-red-500);
+}
+
+/* --- Special Red Glow for Delete Button --- */
+.btn-delete-all:hover {
+  /* This makes the button "pulse" with a red glow */
+  box-shadow: 0 0 20px var(--pico-color-red-600);
+}

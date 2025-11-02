@@ -20,6 +20,7 @@
     {% for message in messages %}
       <article {% if message.tags == 'success' %}style="background-color: var(--pico-color-green-100);"
                {% elif message.tags == 'error' %}style="background-color: var(--pico-color-red-100);"
+               {% elif message.tags == 'warning' %}style="background-color: var(--pico-color-amber-100);"
                {% endif %}>
         {{ message }}
       </article>
@@ -42,7 +43,32 @@
   <hr>
 
   <div class="grid">
-    
+  <article>
+    <hgroup>
+      <h4>Total Income</h4>
+      <h3 class="glow-green" style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
+    </hgroup>
+  </article>
+
+  <article>
+    <hgroup>
+      <h4>Total Expenses</h4>
+      <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
+    </hgroup>
+  </article>
+
+  <article>
+    <hgroup>
+      <h4>Net Balance</h4>
+      {% if net_balance >= 0 %}
+        <h3 class="glow-green" style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
+      {% else %}
+        <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
+      {% endif %}
+    </hgroup>
+  </article>
+</div>
+  <div class="grid">
     <article>
       <hgroup>
         <h3>Spending by Category</h3>
@@ -52,7 +78,6 @@
         <canvas id="spendingPieChart"></canvas>
       </div>
     </article>
-    
     <article>
       <hgroup>
         <h3>Spending Over Time</h3>
@@ -62,54 +87,54 @@
         <canvas id="spendingBarChart"></canvas>
       </div>
     </article>
-  
-  </div> 
-  <div class="grid">
-
-  <article>
-    <h3>Add Transaction</h3>
-    <form method="post">
+  </div> <div class="grid">
+    <article>
+      <h3>Add Transaction</h3>
+      <form method="post" action="{% url 'dashboard' %}">
+        {% csrf_token %}
+        {{ manual_form.as_p }}
+        <button type="submit" name="manual_submit">Save Transaction</button>
+      </form>
+    </article>
+    <article>
+      <h3>Upload Your Bank Statement (CSV)</h3>
+      <form method="post" enctype="multipart/form-data" action="{% url 'dashboard' %}">
+        {% csrf_token %}
+        {{ upload_form.as_p }}
+        <button type="submit" name="csv_submit">Upload</button>
+      </form>
+    </article>
+  </div> <article>
+    <form action="{% url 'update_all_categories' %}" method="post">
       {% csrf_token %}
-      {{ manual_form.as_p }}
-      <button type="submit" name="manual_submit">Save Transaction</button>
-    </form>
-  </article>
-
-  <article>
-    <h3>Upload Your Bank Statement (CSV)</h3>
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      {{ upload_form.as_p }}
-      <button type="submit" name="csv_submit">Upload</button>
-    </form>
-  </article>
-
-</div>
-
-  <article>
-    <h3>Your Transactions</h3>
-    <figure>
-      <table role="grid">
-        <thead>
-          <tr>
-            <th scope="col">Date</th>
-            <th scope="col">Description</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Category</th>
-            <th scope="col" style="width: 20%;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in transactions %}
+      <h3>Your Transactions</h3>
+      <figure>
+        <table role="grid">
+          <thead>
             <tr>
-              <td>{{ t.date }}</td>
-              <td>{{ t.description }}</td>
-              <td>${{ t.amount }}</td>
-              <td>
-                <form action="{% url 'update_category' %}" method="post" style="margin: 0;">
-                  {% csrf_token %}
-                  <input type="hidden" name="transaction_id" value="{{ t.id }}">
-                  <select name="category" onchange="this.form.submit()">
+              <th scope="col">Date</th>
+              <th scope="col">Description</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Category</th>
+              <th scope="col" style="width: 20%;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in transactions %}
+              <tr>
+                <td>{{ t.date }}</td>
+                <td>{{ t.description }}</td>
+                {% if t.amount < 0 %}
+                  <td style="color: var(--pico-color-red-500);">
+                    -${{ t.amount|stringformat:".2f"|slice:"1:" }}
+                  </td>
+                {% else %}
+                  <td style="color: var(--pico-color-green-500);">
+                    +${{ t.amount|floatformat:2 }}
+                  </td>
+                {% endif %}
+                <td>
+                  <select name="category_{{ t.id }}">
                     <option value="">Uncategorized</option>
                     {% for category in categories %}
                       <option value="{{ category.id }}" {% if t.category.id == category.id %}selected{% endif %}>
@@ -117,42 +142,43 @@
                       </option>
                     {% endfor %}
                   </select>
-                </form>
-              </td>
-              
-              <td>
-                <div class="grid" style="margin: 0; padding: 0;">
-                  <a href="{% url 'edit_transaction' t.id %}" role="button" class="outline" style="padding: 5px 10px;">
-                    Edit
-                  </a>
-                  <a href="{% url 'delete_transaction' t.id %}" role="button" class="contrast outline" style="padding: 5px 10px;">
-                    Delete
-                  </a>
-                </div>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="5">No transactions yet. Upload a file to get started!</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </figure>
+                </td>
+                <td>
+                  <div class="grid" style="margin: 0; padding: 0;">
+                    <a href="{% url 'edit_transaction' t.id %}" role="button" class="outline" style="padding: 5px 10px;">
+                      Edit
+                    </a>
+                    <a href="{% url 'delete_transaction' t.id %}" role="button" class="contrast outline" style="padding: 5px 10px;">
+                      Delete
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5">No transactions yet. Upload a file to get started!</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="submit" style="margin-top: 1rem;">Save All Category Changes</button>
+      </figure>
+    </form> <hr>
+    <a href="{% url 'delete_all_transactions' %}" 
+      role="button" 
+      class="contrast btn-delete-all" style="background-color: var(--pico-color-red-600); border-color: var(--pico-color-red-600);">
+      Delete All Transactions
+  </a>
   </article>
-
 {% endblock %}
-
 
 {% block scripts %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      
       // --- 1. Pie Chart ---
       const ctxPie = document.getElementById('spendingPieChart').getContext('2d');
-      if (ctxPie) { // Check if the element exists
+      if (ctxPie) {
         fetch("{% url 'spending_chart_data' %}")
           .then(response => response.json())
           .then(data => {
@@ -169,41 +195,33 @@
                   ],
                 }]
               },
-              options: {
-                responsive: true,
-              }
+              options: { responsive: true }
             });
           });
       }
-
       // --- 2. Bar Chart ---
       const ctxBar = document.getElementById('spendingBarChart').getContext('2d');
-      if (ctxBar) { // Check if the element exists
+      if (ctxBar) {
         fetch("{% url 'spending_bar_chart_data' %}")
           .then(response => response.json())
           .then(data => {
             new Chart(ctxBar, {
               type: 'bar',
               data: {
-                labels: data.labels, // The dates
+                labels: data.labels,
                 datasets: [{
                   label: 'Total Spending',
-                  data: data.data, // The spending amounts
+                  data: data.data,
                   backgroundColor: '#36A2EB',
                 }]
               },
               options: {
                 responsive: true,
-                scales: {
-                  y: {
-                    beginAtZero: true
-                  }
-                }
+                scales: { y: { beginAtZero: true } }
               }
             });
           });
       }
-
     });
   </script>
 {% endblock %}

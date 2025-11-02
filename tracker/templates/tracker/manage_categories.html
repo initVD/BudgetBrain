@@ -12,6 +12,7 @@
   {% for message in messages %}
     <article {% if message.tags == 'success' %}style="background-color: var(--pico-color-green-100);"
              {% elif message.tags == 'error' %}style="background-color: var(--pico-color-red-100);"
+             {% elif message.tags == 'warning' %}style="background-color: var(--pico-color-amber-100);"
              {% endif %}>
       {{ message }}
     </article>
@@ -21,7 +22,7 @@
 <div class="grid">
   <article>
     <h3>Add a New Category</h3>
-    <form method="post">
+    <form method="post" action="{% url 'manage_categories' %}">
       {% csrf_token %}
       {{ form.as_p }}
       <button type="submit">Save Category</button>
@@ -29,17 +30,30 @@
   </article>
 
   <article>
-    <h3>Your Categories</h3>
-    {% if categories %}
-      <ul>
-        {% for category in categories %}
-          <li>{{ category.name }}</li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>You haven't added any categories yet.</p>
-    {% endif %}
+    <h3>Retrain AI "Brain"</h3>
+    <p>
+      Click this button to force the AI to re-learn from all of your 
+      manually categorized transactions. This is useful after you add
+      a new category or make a lot of corrections.
+    </p>
+    <form action="{% url 'retrain_ai' %}" method="post">
+      {% csrf_token %}
+      <button type="submit">Retrain AI Now</button>
+    </form>
   </article>
 </div>
+
+<article>
+  <h3>Your Categories</h3>
+  {% if categories %}
+    <ul>
+      {% for category in categories %}
+        <li>{{ category.name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>You haven't added any categories yet.</p>
+  {% endif %}
+</article>
 
 {% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <article>
+    <hgroup>
+      <h2 style="color: var(--pico-color-red-600);">Delete All Transactions?</h2>
+      <h3>This action is permanent and cannot be undone.</h3>
+    </hgroup>
+
+    <p>Are you sure you want to permanently delete all of your transactions? This will clear your entire dashboard, charts, and transaction history.</p>
+    <p>Your custom categories will **not** be deleted.</p>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="grid">
+        <a href="{% url 'dashboard' %}" role="button" class="secondary">Cancel, Go Back</a>
+
+        <button type="submit" class="contrast" style="background-color: var(--pico-color-red-600); border-color: var(--pico-color-red-600);">
+          Yes, Delete Everything
+        </button>
+      </div>
+    </form>
+
+  </article>
+{% endblock %}
