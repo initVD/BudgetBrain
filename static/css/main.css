@@ -9,12 +9,8 @@ article {
 
 article:hover {
   transform: translateY(-5px);
-
-  /* THIS IS THE GLOW: 
-     A blueish shadow. You can change the color.
-     '#36A2EB' is the blue from our bar chart.
-     '80' at the end adds 50% transparency.
-  */
+  
+  /* Blueish shadow on hover */
   box-shadow: 0 0 25px #36a2eb80;
   border-color: #36A2EB;
 }
@@ -27,8 +23,6 @@ a[role="button"]:hover {
 }
 
 /* --- Summary Card Text Glow (Permanent) --- */
-/* format: h-offset v-offset blur-radius color */
-
 .glow-green {
   text-shadow: 0 0 12px var(--pico-color-green-500);
 }
@@ -39,6 +33,24 @@ a[role="button"]:hover {
 
 /* --- Special Red Glow for Delete Button --- */
 .btn-delete-all:hover {
-  /* This makes the button "pulse" with a red glow */
   box-shadow: 0 0 20px var(--pico-color-red-600);
+}
+
+/* --- Budget Progress Bar Styling --- */
+progress::-webkit-progress-value {
+  transition: all 0.3s ease;
+}
+
+/* This makes the bar red when over budget */
+progress.over-budget::-webkit-progress-value {
+  background-color: var(--pico-color-red-500) !important;
+}
+
+/* Firefox-specific versions */
+progress::-moz-progress-bar {
+  transition: all 0.3s ease;
+}
+
+progress.over-budget::-moz-progress-bar {
+  background-color: var(--pico-color-red-500) !important;
 }

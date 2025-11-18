@@ -2,18 +2,37 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db.models import Sum
 from django.contrib import messages
 import pandas as pd
 import io
 from datetime import datetime
-import re # We still need re for cleaning amount strings
-
+import re
+import csv # <-- NEW: For CSV export
+from reportlab.pdfgen import canvas # <-- NEW: For PDF export
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import random
 from .models import Transaction, Category
-from .forms import CSVUploadForm, CategoryForm, TransactionForm
+# Updated imports to include new forms
+from .forms import CSVUploadForm, CategoryForm, TransactionForm, SavingsCalculatorForm, LoanCalculatorForm
 from .ai_engine import train_models, predict_transaction, create_pretrained_models 
 
+FINANCIAL_TIPS = [
+    "Beware of little expenses. A small leak will sink a great ship. - Benjamin Franklin",
+    "The art is not in making money, but in keeping it. - Proverb",
+    "Do not save what is left after spending, but spend what is left after saving. - Warren Buffett",
+    "A budget is telling your money where to go instead of wondering where it went. - Dave Ramsey",
+    "He who buys what he does not need, steals from himself. - Swedish Proverb",
+    "Financial freedom is available to those who learn about it and work for it. - Robert Kiyosaki",
+    "It's not how much money you make, but how much money you keep. - Robert Kiyosaki",
+    "The quickest way to double your money is to fold it over and put it back in your pocket.",
+    "Rich people stay rich by living like they're broke. Broke people stay broke by living like they're rich.",
+    "Compound interest is the eighth wonder of the world. He who understands it, earns it. He who doesn't, pays it. - Albert Einstein"
+]
 # --- Load the Pre-Trained AI "Brain" ---
 print("Training pre-trained AI model from CSV... this may take a moment.")
 PRE_TRAINED_MODELS = create_pretrained_models()
@@ -21,7 +40,6 @@ if PRE_TRAINED_MODELS:
     print("Pre-trained AI model loaded successfully!")
 else:
     print("WARNING: 'financial_dataset_24000_realistic.csv' not found. AI will not be pre-trained.")
-# --- END NEW ---
 
 # --- User Account Views ---
 def register(request):
@@ -49,7 +67,7 @@ def dashboard(request):
         transactions = Transaction.objects.filter(user=request.user)
         if transactions.count() > 0:
             df = pd.DataFrame(list(transactions.values('date', 'category__name', 'amount')))
-            df['date'] = pd.to_datetime(df['date']) 
+            df['date'] = pd.to_datetime(df['date'])
             df['amount'] = pd.to_numeric(df['amount'])
             df.rename(columns={'category__name': 'category'}, inplace=True)
             
@@ -165,37 +183,55 @@ def dashboard(request):
     # --- END DUAL-FORM HANDLING ---
 
 
-    # --- Search & Filter Logic (NOW WITH DATES) ---
+    # --- Search & Filter Logic ---
     query = request.GET.get('q')
     category_id = request.GET.get('category')
-    date_from = request.GET.get('date_from') # <-- NEW
-    date_to = request.GET.get('date_to')     # <-- NEW
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
     
     all_transactions = Transaction.objects.filter(user=request.user)
     
     if query:
         all_transactions = all_transactions.filter(description__icontains=query)
-    
     if category_id:
         all_transactions = all_transactions.filter(category_id=category_id)
-        
     if date_from:
-        all_transactions = all_transactions.filter(date__gte=date_from) # <-- NEW (gte = greater than or equal)
-        
+        all_transactions = all_transactions.filter(date__gte=date_from)
     if date_to:
-        all_transactions = all_transactions.filter(date__lte=date_to) # <-- NEW (lte = less than or equal)
+        all_transactions = all_transactions.filter(date__lte=date_to)
         
     all_transactions = all_transactions.order_by('-date')
     # --- END Search & Filter Logic ---
 
-    
-    # --- Context (to send data to template) ---
+    # --- Context ---
     total_income = all_transactions.filter(amount__gt=0).aggregate(Sum('amount'))['amount__sum'] or 0
     total_expenses = all_transactions.filter(amount__lt=0).aggregate(Sum('amount'))['amount__sum'] or 0
     net_balance = total_income + total_expenses
     
     user_categories = Category.objects.filter(user=request.user)
     
+    # Budget Tracker Logic
+    now = datetime.now()
+    budgeted_categories = Category.objects.filter(user=request.user, budget_limit__gt=0)
+    budget_trackers = []
+    
+    for category in budgeted_categories:
+        spending = Transaction.objects.filter(
+            user=request.user,
+            category=category,
+            date__year=now.year,
+            date__month=now.month,
+            amount__lt=0
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+        spending = abs(spending)
+        percentage = int((spending / category.budget_limit) * 100) if category.budget_limit > 0 else 0
+        budget_trackers.append({
+            'category': category,
+            'spending': spending,
+            'percentage': percentage,
+            'is_over_budget': spending > category.budget_limit
+        })
+
     context = {
         'transactions': all_transactions,
         'upload_form': upload_form,
@@ -205,20 +241,17 @@ def dashboard(request):
         'total_income': total_income,
         'total_expenses': abs(total_expenses),
         'net_balance': net_balance,
-        
         'search_query': query or '',
         'selected_category_id': category_id or '',
-        'date_from': date_from or '', # <-- NEW
-        'date_to': date_to or '',     # <-- NEW
+        'date_from': date_from or '',
+        'date_to': date_to or '',
+        'budget_trackers': budget_trackers,
+        'financial_tip': random.choice(FINANCIAL_TIPS),
     }
     return render(request, 'tracker/dashboard.html', context)
 
-# --- HELPER FUNCTION (No changes) ---
+# --- HELPER FUNCTION ---
 def save_transaction_from_data(user, models, date, description, amount_str):
-    """
-    A helper function to process and save a transaction from
-    a CSV file.
-    """
     amount_str_clean = re.sub(r'[$,()]', '', amount_str)
     amount = abs(pd.to_numeric(amount_str_clean))
     
@@ -230,12 +263,10 @@ def save_transaction_from_data(user, models, date, description, amount_str):
     elif '+' in amount_str:
          predicted_type = 'Income'
 
-    
     if models:
         try:
             ai_type, predicted_cat_name = predict_transaction(models, description)
             predicted_type = ai_type
-            
             if predicted_cat_name:
                 predicted_category_obj = Category.objects.get(user=user, name=predicted_cat_name)
         except Category.DoesNotExist:
@@ -254,20 +285,32 @@ def save_transaction_from_data(user, models, date, description, amount_str):
         category=predicted_category_obj
     )
 
-# --- OTHER VIEWS (No changes) ---
+# --- CATEGORY & TRANSACTION VIEWS ---
+
 @login_required
 def manage_categories(request):
     if request.method == 'POST':
-        form = CategoryForm(request.POST)
-        if form.is_valid():
-            category = form.save(commit=False)
-            category.user = request.user
+        if 'update_category_id' in request.POST:
+            category_id = request.POST.get('update_category_id')
+            category = get_object_or_404(Category, id=category_id, user=request.user)
+            new_limit = request.POST.get(f'budget_{category_id}')
             try:
+                category.budget_limit = new_limit
                 category.save()
-                messages.success(request, 'New category added!')
-            except Exception:
-                messages.error(request, 'That category name already exists.')
-            return redirect('manage_categories')
+                messages.success(request, f'Budget for "{category.name}" updated!')
+            except Exception as e:
+                messages.error(request, f'Error updating budget: {e}')
+        else:
+            form = CategoryForm(request.POST)
+            if form.is_valid():
+                category = form.save(commit=False)
+                category.user = request.user
+                try:
+                    category.save()
+                    messages.success(request, 'New category added!')
+                except Exception:
+                    messages.error(request, 'That category name already exists.')
+        return redirect('manage_categories')
     else:
         form = CategoryForm()
     categories = Category.objects.filter(user=request.user).order_by('name')
@@ -285,7 +328,6 @@ def update_all_categories(request):
                     new_category_id = value
                     if (new_category_id == "" and transaction.category is not None) or \
                        (new_category_id != "" and str(transaction.category_id) != new_category_id):
-                        
                         if new_category_id:
                             new_category = get_object_or_404(Category, id=new_category_id, user=request.user)
                             transaction.category = new_category
@@ -361,10 +403,22 @@ def retrain_ai(request):
             messages.error(request, f'An error occurred during retraining: {e}')
     return redirect('manage_categories')
 
-# --- Chart Data Views (JSON) ---
+# --- CHART & EXPORT VIEWS ---
+
 @login_required
 def spending_chart_data(request):
     user_transactions = Transaction.objects.filter(user=request.user, amount__lt=0)
+    
+    # Filter chart by search/date too
+    query = request.GET.get('q')
+    category_id = request.GET.get('category')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if query: user_transactions = user_transactions.filter(description__icontains=query)
+    if category_id: user_transactions = user_transactions.filter(category_id=category_id)
+    if date_from: user_transactions = user_transactions.filter(date__gte=date_from)
+    if date_to: user_transactions = user_transactions.filter(date__lte=date_to)
+    
     category_spending = user_transactions.values('category__name').annotate(
         total_amount=Sum('amount')
     ).order_by('-total_amount')
@@ -379,6 +433,17 @@ def spending_chart_data(request):
 @login_required
 def spending_bar_chart_data(request):
     user_transactions = Transaction.objects.filter(user=request.user, amount__lt=0).order_by('date')
+    
+    # Filter chart by search/date too
+    query = request.GET.get('q')
+    category_id = request.GET.get('category')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if query: user_transactions = user_transactions.filter(description__icontains=query)
+    if category_id: user_transactions = user_transactions.filter(category_id=category_id)
+    if date_from: user_transactions = user_transactions.filter(date__gte=date_from)
+    if date_to: user_transactions = user_transactions.filter(date__lte=date_to)
+
     date_spending = user_transactions.values('date').annotate(
         total_amount=Sum('amount')
     ).order_by('date')
@@ -388,3 +453,151 @@ def spending_bar_chart_data(request):
         labels.append(item['date'].strftime('%b %d'))
         data.append(float(abs(item['total_amount'])))
     return JsonResponse({'labels': labels, 'data': data})
+
+@login_required
+def export_transactions_csv(request):
+    query = request.GET.get('q')
+    category_id = request.GET.get('category')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    transactions = Transaction.objects.filter(user=request.user)
+    if query: transactions = transactions.filter(description__icontains=query)
+    if category_id: transactions = transactions.filter(category_id=category_id)
+    if date_from: transactions = transactions.filter(date__gte=date_from)
+    if date_to: transactions = transactions.filter(date__lte=date_to)
+    transactions = transactions.order_by('-date')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Description', 'Amount', 'Category', 'Type'])
+    
+    for t in transactions:
+        category_name = t.category.name if t.category else 'Uncategorized'
+        trans_type = 'Income' if t.amount > 0 else 'Expense'
+        writer.writerow([t.date, t.description, t.amount, category_name, trans_type])
+        
+    return response
+
+@login_required
+def export_transactions_pdf(request):
+    query = request.GET.get('q')
+    category_id = request.GET.get('category')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    transactions = Transaction.objects.filter(user=request.user)
+    if query: transactions = transactions.filter(description__icontains=query)
+    if category_id: transactions = transactions.filter(category_id=category_id)
+    if date_from: transactions = transactions.filter(date__gte=date_from)
+    if date_to: transactions = transactions.filter(date__lte=date_to)
+    transactions = transactions.order_by('-date')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph("BudgetBrain Transaction Report", styles['Title']))
+    elements.append(Spacer(1, 20))
+
+    data = [['Date', 'Description', 'Category', 'Type', 'Amount']]
+    total_balance = 0
+    for t in transactions:
+        category_name = t.category.name if t.category else 'Uncategorized'
+        trans_type = 'Income' if t.amount > 0 else 'Expense'
+        amount_str = f"${abs(t.amount):,.2f}"
+        if t.amount > 0: amount_str = f"+{amount_str}"
+        else: amount_str = f"-{amount_str}"
+        total_balance += t.amount
+        data.append([t.date.strftime('%Y-%m-%d'), t.description[:30], category_name, trans_type, amount_str])
+        
+    data.append(['', '', '', 'NET BALANCE:', f"${total_balance:,.2f}"])
+
+    table = Table(data, colWidths=[80, 200, 100, 60, 80])
+    style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ])
+    
+    for i, row in enumerate(data[1:-1], start=1):
+        if row[3] == 'Income': style.add('TEXTCOLOR', (4, i), (4, i), colors.green)
+        else: style.add('TEXTCOLOR', (4, i), (4, i), colors.red)
+            
+    style.add('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
+    style.add('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey)
+    table.setStyle(style)
+    elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="transaction_report.pdf"'
+    return response
+
+# --- NEW: CALCULATOR VIEW ---
+@login_required
+def calculators(request):
+    """Page for Financial Calculators."""
+    savings_form = SavingsCalculatorForm()
+    loan_form = LoanCalculatorForm()
+    savings_result = None
+    loan_result = None
+    
+    if request.method == 'POST':
+        if 'savings_submit' in request.POST:
+            savings_form = SavingsCalculatorForm(request.POST)
+            if savings_form.is_valid():
+                goal = savings_form.cleaned_data['goal_amount']
+                current = savings_form.cleaned_data['current_savings'] or 0
+                target = savings_form.cleaned_data['target_date']
+                today = datetime.now().date()
+                
+                # Calculate months remaining roughly
+                months = (target.year - today.year) * 12 + (target.month - today.month)
+                
+                if months <= 0:
+                    savings_result = "The target date must be in the future!"
+                else:
+                    needed = goal - current
+                    if needed <= 0:
+                        savings_result = "You have already reached your goal!"
+                    else:
+                        monthly_save = needed / months
+                        savings_result = f"To reach ${goal:,.2f} by {target}, you need to save ${monthly_save:,.2f} per month."
+
+        elif 'loan_submit' in request.POST:
+            loan_form = LoanCalculatorForm(request.POST)
+            if loan_form.is_valid():
+                principal = loan_form.cleaned_data['loan_amount']
+                rate = loan_form.cleaned_data['interest_rate']
+                years = loan_form.cleaned_data['term_years']
+                
+                # Monthly interest rate
+                r = (rate / 100) / 12
+                n = years * 12
+                
+                if r == 0:
+                    monthly_payment = principal / n
+                else:
+                    monthly_payment = principal * (r * (1 + r)**n) / ((1 + r)**n - 1)
+                
+                total_payment = monthly_payment * n
+                total_interest = total_payment - principal
+                
+                loan_result = f"Monthly Payment: ${monthly_payment:,.2f} (Total Interest: ${total_interest:,.2f})"
+
+    context = {
+        'savings_form': savings_form,
+        'loan_form': loan_form,
+        'savings_result': savings_result,
+        'loan_result': loan_result
+    }
+    return render(request, 'tracker/calculators.html', context)

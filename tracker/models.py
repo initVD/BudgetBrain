@@ -4,17 +4,21 @@ from django.contrib.auth.models import User
 
 # --- THIS IS NEW ---
 # Our new Category model. Each user will have their own set of categories.
+# tracker/models.py
+
 class Category(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
     name = models.CharField(max_length=100)
+
+    # --- ADD THIS NEW LINE ---
+    # We'll allow it to be 0 (no budget) by default.
+    budget_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return self.name
 
     class Meta:
-        # This prevents a user from having two categories with the same name
         unique_together = ('user', 'name')
-        # This just makes the admin panel look nice (plural of Category is Categories)
         verbose_name_plural = "Categories"
 
 # --- NOTICE THE `CATEGORY_CHOICES` TUPLE IS GONE ---

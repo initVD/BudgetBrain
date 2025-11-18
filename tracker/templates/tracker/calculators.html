@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<nav>
+  <ul>
+    <li><a href="{% url 'dashboard' %}">Back to Dashboard</a></li>
+  </ul>
+  <ul>
+      <li title="Toggle dark/light mode">
+        <label for="theme-switcher" style="margin-bottom: 0;">
+          <input type="checkbox" id="theme-switcher" role="switch">
+        </label>
+      </li>
+  </ul>
+</nav>
+
+<h2 style="text-align: center;">Financial Tools</h2>
+
+<div class="grid">
+  
+  <article>
+    <hgroup>
+      <h3>Savings Goal Calculator</h3>
+      <p>Find out how much to save monthly to reach your goal.</p>
+    </hgroup>
+    
+    <form method="post">
+      {% csrf_token %}
+      {{ savings_form.as_p }}
+      <button type="submit" name="savings_submit">Calculate Savings</button>
+    </form>
+    
+    {% if savings_result %}
+      <footer style="background-color: var(--pico-color-green-100); color: var(--pico-color-green-900);">
+        <strong>Result:</strong> {{ savings_result }}
+      </footer>
+    {% endif %}
+  </article>
+
+  <article>
+    <hgroup>
+      <h3>Loan Payment Calculator</h3>
+      <p>Estimate your monthly payments for a loan.</p>
+    </hgroup>
+    
+    <form method="post">
+      {% csrf_token %}
+      {{ loan_form.as_p }}
+      <button type="submit" name="loan_submit">Calculate Payment</button>
+    </form>
+    
+    {% if loan_result %}
+      <footer style="background-color: var(--pico-color-blue-100); color: var(--pico-color-blue-900);">
+        <strong>Result:</strong> {{ loan_result }}
+      </footer>
+    {% endif %}
+  </article>
+
+</div>
+{% endblock %}

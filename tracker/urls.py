@@ -26,4 +26,11 @@ urlpatterns = [
     # AI Triggers
     path('retrain_ai/', views.retrain_ai, name='retrain_ai'),
     path('update_all/', views.update_all_categories, name='update_all_categories'),
+
+    # Export Features
+    path('export/', views.export_transactions_csv, name='export_transactions_csv'),
+    path('export_pdf/', views.export_transactions_pdf, name='export_transactions_pdf'),
+    
+    # Tools
+    path('tools/', views.calculators, name='calculators'),
 ]

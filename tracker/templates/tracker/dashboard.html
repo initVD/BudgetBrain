@@ -5,6 +5,7 @@
     <ul>
       <li><strong>Welcome, {{ user.username }}!</strong></li>
       <li><a href="{% url 'manage_categories' %}">Manage Categories</a></li>
+      <li><a href="{% url 'calculators' %}">Tools</a></li>
     </ul>
     <ul>
       <li title="Toggle dark/light mode">
@@ -45,34 +46,68 @@
       </ul>
     </article>
   {% endif %}
+
   <hr>
 
   <div class="grid">
     <article>
       <hgroup>
         <h4>Total Income</h4>
-        <h3 class="glow-green" style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
+        <h3 class="glow-green" style="color: var(--pico-color-green-500);">+{{ user.userprofile.currency_symbol }}{{ total_income|floatformat:2 }}</h3>
       </hgroup>
     </article>
     <article>
       <hgroup>
         <h4>Total Expenses</h4>
-        <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
+        <h3 class="glow-red" style="color: var(--pico-color-red-500);">-{{ user.userprofile.currency_symbol }}{{ total_expenses|floatformat:2 }}</h3>
       </hgroup>
     </article>
     <article>
       <hgroup>
         <h4>Net Balance</h4>
         {% if net_balance >= 0 %}
-          <h3 class="glow-green" style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
+          <h3 class="glow-green" style="color: var(--pico-color-green-500);">{{ user.userprofile.currency_symbol }}{{ net_balance|floatformat:2 }}</h3>
         {% else %}
-          <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
+          <h3 class="glow-red" style="color: var(--pico-color-red-500);">-{{ user.userprofile.currency_symbol }}{{ net_balance|floatformat:2|slice:"1:" }}</h3>
         {% endif %}
       </hgroup>
     </article>
   </div>
+
+  <article style="background-color: var(--pico-color-azure-50); border-left: 5px solid var(--pico-color-azure-500);">
+    <hgroup>
+      <h4 style="color: var(--pico-color-azure-800);">💡 Financial Wisdom</h4>
+      <p style="font-style: italic; color: var(--pico-color-azure-900);">
+        "{{ financial_tip }}"
+      </p>
+    </hgroup>
+  </article>
+
+  {% if budget_trackers %}
+  <article>
+    <hgroup>
+      <h3>This Month's Budgets</h3>
+      <p>Your spending progress for the current month.</p>
+    </hgroup>
+    {% for tracker in budget_trackers %}
+      <label for="budget-{{ tracker.category.id }}">
+        {{ tracker.category.name }}
+        <span style="float: right;">
+          {{ user.userprofile.currency_symbol }}{{ tracker.spending|floatformat:2 }} / {{ user.userprofile.currency_symbol }}{{ tracker.category.budget_limit|floatformat:2 }}
+        </span>
+      </label>
+      <progress 
+        id="budget-{{ tracker.category.id }}" 
+        value="{{ tracker.spending }}" 
+        max="{{ tracker.category.budget_limit }}"
+        {% if tracker.is_over_budget %}class="over-budget"{% endif %}>
+      </progress>
+    {% endfor %}
+  </article>
+  {% endif %}
+
   <div class="grid">
-    <article>
+    <article class="chart-card">
       <hgroup>
         <h3>Spending by Category</h3>
         <p>Where your money went.</p>
@@ -81,7 +116,7 @@
         <canvas id="spendingPieChart"></canvas>
       </div>
     </article>
-    <article>
+    <article class="chart-card">
       <hgroup>
         <h3>Spending Over Time</h3>
         <p>When you spent your money.</p>
@@ -90,7 +125,9 @@
         <canvas id="spendingBarChart"></canvas>
       </div>
     </article>
-  </div> <div class="grid">
+  </div>
+
+  <div class="grid">
     <article>
       <h3>Add Transaction</h3>
       <form method="post" action="{% url 'dashboard' %}">
@@ -107,14 +144,17 @@
         <button type="submit" name="csv_submit">Upload</button>
       </form>
     </article>
-  </div> <article>
-    
-    <form method="get" action="{% url 'dashboard' %}">
+  </div>
+
+  <article>
+    <header><strong>Search & Filter</strong></header>
+    <form method="get" action="{% url 'dashboard' %}" style="margin-bottom: 0;">
+      
       <div class="grid">
         <input 
           type="text" 
           name="q" 
-          placeholder="Search by name..." 
+          placeholder="Search by name (e.g., 'Starbucks')..." 
           value="{{ search_query }}">
           
         <select name="category">
@@ -127,14 +167,42 @@
             </option>
           {% endfor %}
         </select>
-        
-        <input type="date" name="date_from" value="{{ date_from }}">
-        <input type="date" name="date_to" value="{{ date_to }}">
-        
-        <button type="submit">Search</button>
-        <a href="{% url 'dashboard' %}" role="button" class="secondary">Clear</a>
       </div>
+
+      <div class="grid">
+        <label>
+          From:
+          <input type="date" name="date_from" value="{{ date_from }}">
+        </label>
+        <label>
+          To:
+          <input type="date" name="date_to" value="{{ date_to }}">
+        </label>
+        
+        <button type="submit" style="margin-top: 1.2rem;">Search</button>
+        <a href="{% url 'dashboard' %}" role="button" class="secondary" style="margin-top: 1.2rem;">Clear</a>
+      </div>
+      
     </form>
+    
+    <hr>
+
+    <div class="grid">
+         <a href="{% url 'export_transactions_csv' %}?q={{ search_query }}&category={{ selected_category_id }}&date_from={{ date_from }}&date_to={{ date_to }}" 
+            role="button" 
+            class="contrast outline">
+            Export CSV
+         </a>
+         <a href="{% url 'export_transactions_pdf' %}?q={{ search_query }}&category={{ selected_category_id }}&date_from={{ date_from }}&date_to={{ date_to }}" 
+            role="button" 
+            class="outline"
+            style="border-color: var(--pico-color-red-600); color: var(--pico-color-red-600);">
+            Export PDF
+         </a>
+    </div>
+    
+    <hr>
+
     <form action="{% url 'update_all_categories' %}" method="post">
       {% csrf_token %}
       <h3>Your Transactions</h3>
@@ -156,11 +224,11 @@
                 <td>{{ t.description }}</td>
                 {% if t.amount < 0 %}
                   <td style="color: var(--pico-color-red-500);">
-                    -${{ t.amount|stringformat:".2f"|slice:"1:" }}
+                    -{{ user.userprofile.currency_symbol }}{{ t.amount|stringformat:".2f"|slice:"1:" }}
                   </td>
                 {% else %}
                   <td style="color: var(--pico-color-green-500);">
-                    +${{ t.amount|floatformat:2 }}
+                    +{{ user.userprofile.currency_symbol }}{{ t.amount|floatformat:2 }}
                   </td>
                 {% endif %}
                 <td>
@@ -175,12 +243,8 @@
                 </td>
                 <td>
                   <div class="grid" style="margin: 0; padding: 0;">
-                    <a href="{% url 'edit_transaction' t.id %}" role="button" class="outline" style="padding: 5px 10px;">
-                      Edit
-                    </a>
-                    <a href="{% url 'delete_transaction' t.id %}" role="button" class="contrast outline" style="padding: 5px 10px;">
-                      Delete
-                    </a>
+                    <a href="{% url 'edit_transaction' t.id %}" role="button" class="outline" style="padding: 5px 10px;">Edit</a>
+                    <a href="{% url 'delete_transaction' t.id %}" role="button" class="contrast outline" style="padding: 5px 10px;">Delete</a>
                   </div>
                 </td>
               </tr>
@@ -193,7 +257,8 @@
         </table>
         <button type="submit" style="margin-top: 1rem;">Save All Category Changes</button>
       </figure>
-    </form> <hr>
+    </form> 
+    <hr>
     <a href="{% url 'delete_all_transactions' %}" 
        role="button" 
        class="contrast btn-delete-all" 
@@ -203,16 +268,14 @@
   </article>
 {% endblock %}
 
-
 {% block scripts %}
   {{ block.super }} 
-
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // --- 1. Pie Chart ---
       const ctxPie = document.getElementById('spendingPieChart').getContext('2d');
       if (ctxPie) {
-        fetch("{% url 'spending_chart_data' %}")
+        const urlParams = new URLSearchParams(window.location.search);
+        fetch("{% url 'spending_chart_data' %}?" + urlParams.toString())
           .then(response => response.json())
           .then(data => {
             new Chart(ctxPie, {
@@ -220,22 +283,18 @@
               data: {
                 labels: data.labels,
                 datasets: [{
-                  label: 'Spending by Category',
                   data: data.data,
-                  backgroundColor: [
-                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                    '#FF9F40', '#E7E9ED', '#800080', '#008080', '#FFC0CB'
-                  ],
+                  backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
                 }]
               },
               options: { responsive: true }
             });
           });
       }
-      // --- 2. Bar Chart ---
       const ctxBar = document.getElementById('spendingBarChart').getContext('2d');
       if (ctxBar) {
-        fetch("{% url 'spending_bar_chart_data' %}")
+        const urlParams = new URLSearchParams(window.location.search);
+        fetch("{% url 'spending_bar_chart_data' %}?" + urlParams.toString())
           .then(response => response.json())
           .then(data => {
             new Chart(ctxBar, {
