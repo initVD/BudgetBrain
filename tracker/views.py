@@ -8,12 +8,13 @@ from django.contrib import messages
 import pandas as pd
 import io
 from datetime import datetime
+import re # We still need re for cleaning amount strings
 
 from .models import Transaction, Category
 from .forms import CSVUploadForm, CategoryForm, TransactionForm
 from .ai_engine import train_models, predict_transaction, create_pretrained_models 
 
-# --- Load the Pre-Trained AI "Brain" when the server starts! ---
+# --- Load the Pre-Trained AI "Brain" ---
 print("Training pre-trained AI model from CSV... this may take a moment.")
 PRE_TRAINED_MODELS = create_pretrained_models()
 if PRE_TRAINED_MODELS:
@@ -48,7 +49,7 @@ def dashboard(request):
         transactions = Transaction.objects.filter(user=request.user)
         if transactions.count() > 0:
             df = pd.DataFrame(list(transactions.values('date', 'category__name', 'amount')))
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date']) 
             df['amount'] = pd.to_numeric(df['amount'])
             df.rename(columns={'category__name': 'category'}, inplace=True)
             
@@ -85,85 +86,60 @@ def dashboard(request):
     # --- DUAL-FORM HANDLING ---
     if request.method == 'POST':
         
+        # --- CSV UPLOAD LOGIC ---
         if 'csv_submit' in request.POST:
             upload_form = CSVUploadForm(request.POST, request.FILES)
             manual_form = TransactionForm(user=request.user) 
             
             if upload_form.is_valid():
-                csv_file = request.FILES['csv_file']
-                if not csv_file.name.endswith('.csv'):
-                    messages.error(request, 'This is not a CSV file.')
+                uploaded_file = request.FILES['csv_file']
+                
+                if not uploaded_file.name.endswith('.csv'):
+                    messages.error(request, 'Invalid file type. Please upload a .csv file.')
+                    return redirect('dashboard')
+                
+                models, accuracies = train_models(request.user) 
+                if not models:
+                    models = PRE_TRAINED_MODELS
+                if models:
+                    messages.info(request, 'AI "Brain" is active.')
                 else:
+                    messages.info(request, 'No AI model found. Uploading as uncategorized.')
+                
+                transactions_saved = 0
+                
+                try:
+                    file_data = uploaded_file.read().decode('utf-8')
+                    csv_data = io.StringIO(file_data)
+                    df = pd.read_csv(csv_data)
                     
-                    # --- BUG #3 (FIXED): Must get models AND accuracies ---
-                    models, accuracies = train_models(request.user) 
-                    if not models:
-                        models = PRE_TRAINED_MODELS
-                    
-                    if models:
-                        messages.info(request, 'AI "Brain" is active.')
+                    if 'Transaction Description' in df.columns:
+                        desc_col, amt_col = 'Transaction Description', 'Amount ($)'
+                    elif 'Description' in df.columns:
+                        desc_col, amt_col = 'Description', 'Amount'
                     else:
-                        messages.info(request, 'No AI model found. Uploading as uncategorized.')
+                        raise KeyError("CSV must have 'Description'/'Amount' OR 'Transaction Description'/'Amount ($)' columns.")
+
+                    for index, row in df.iterrows():
+                        description = str(row[desc_col])
+                        amount_str = str(row[amt_col])
+                        try:
+                            transaction_date = pd.to_datetime(row['Date'])
+                        except KeyError:
+                            transaction_date = datetime.now().date()
+                        
+                        save_transaction_from_data(request.user, models, transaction_date, description, amount_str)
+                        transactions_saved += 1
                     
-                    try:
-                        file_data = csv_file.read().decode('utf-8')
-                        csv_data = io.StringIO(file_data)
-                        df = pd.read_csv(csv_data)
-                        
-                        # --- Smart Column Detection ---
-                        if 'Transaction Description' in df.columns:
-                            desc_col = 'Transaction Description'
-                            amt_col = 'Amount ($)'
-                        elif 'Description' in df.columns:
-                            desc_col = 'Description'
-                            amt_col = 'Amount'
-                        else:
-                            raise KeyError("CSV must have 'Description'/'Amount' OR 'Transaction Description'/'Amount ($)' columns.")
-                        
-                        transactions_saved = 0
-                        for index, row in df.iterrows():
-                            
-                            description = str(row[desc_col])
-                            amount = abs(pd.to_numeric(row[amt_col])) 
-                            
-                            predicted_type = 'Expense' 
-                            predicted_category_obj = None
-                            
-                            if models:
-                                try:
-                                    predicted_type, predicted_cat_name = predict_transaction(models, description)
-                                    if predicted_cat_name:
-                                        predicted_category_obj = Category.objects.get(user=request.user, name=predicted_cat_name)
-                                except Category.DoesNotExist:
-                                    predicted_category_obj = Category.objects.create(user=request.user, name=predicted_cat_name)
-                                except:
-                                    pass 
-                            
-                            if predicted_type == 'Expense':
-                                amount = -amount
-                            
-                            # --- Handle missing 'Date' column ---
-                            try:
-                                transaction_date = pd.to_datetime(row['Date'])
-                            except KeyError:
-                                transaction_date = datetime.now().date()
-                            
-                            Transaction.objects.create(
-                                user=request.user,
-                                date=transaction_date, 
-                                description=description,
-                                amount=amount,
-                                category=predicted_category_obj
-                            )
-                            transactions_saved += 1
-                        
-                        messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
-                    except KeyError as e:
-                        messages.error(request, f"Column error: {e}")
-                    except Exception as e:
-                        messages.error(request, f'Error processing file: {e}')
+                    messages.success(request, f'File uploaded! {transactions_saved} new transactions saved.')
+
+                except KeyError as e:
+                    messages.error(request, f"Column error: {e}")
+                except Exception as e:
+                    messages.error(request, f'Error processing file: {e}')
                 return redirect('dashboard') 
 
+        # --- MANUAL SUBMIT LOGIC ---
         elif 'manual_submit' in request.POST:
             manual_form = TransactionForm(request.POST, user=request.user)
             upload_form = CSVUploadForm() 
@@ -188,9 +164,32 @@ def dashboard(request):
         manual_form = TransactionForm(user=request.user)
     # --- END DUAL-FORM HANDLING ---
 
-    # --- Context (to send data to template) ---
-    all_transactions = Transaction.objects.filter(user=request.user).order_by('-date')
+
+    # --- Search & Filter Logic (NOW WITH DATES) ---
+    query = request.GET.get('q')
+    category_id = request.GET.get('category')
+    date_from = request.GET.get('date_from') # <-- NEW
+    date_to = request.GET.get('date_to')     # <-- NEW
     
+    all_transactions = Transaction.objects.filter(user=request.user)
+    
+    if query:
+        all_transactions = all_transactions.filter(description__icontains=query)
+    
+    if category_id:
+        all_transactions = all_transactions.filter(category_id=category_id)
+        
+    if date_from:
+        all_transactions = all_transactions.filter(date__gte=date_from) # <-- NEW (gte = greater than or equal)
+        
+    if date_to:
+        all_transactions = all_transactions.filter(date__lte=date_to) # <-- NEW (lte = less than or equal)
+        
+    all_transactions = all_transactions.order_by('-date')
+    # --- END Search & Filter Logic ---
+
+    
+    # --- Context (to send data to template) ---
     total_income = all_transactions.filter(amount__gt=0).aggregate(Sum('amount'))['amount__sum'] or 0
     total_expenses = all_transactions.filter(amount__lt=0).aggregate(Sum('amount'))['amount__sum'] or 0
     net_balance = total_income + total_expenses
@@ -206,10 +205,56 @@ def dashboard(request):
         'total_income': total_income,
         'total_expenses': abs(total_expenses),
         'net_balance': net_balance,
+        
+        'search_query': query or '',
+        'selected_category_id': category_id or '',
+        'date_from': date_from or '', # <-- NEW
+        'date_to': date_to or '',     # <-- NEW
     }
     return render(request, 'tracker/dashboard.html', context)
 
-# --- Category & Transaction Management Views ---
+# --- HELPER FUNCTION (No changes) ---
+def save_transaction_from_data(user, models, date, description, amount_str):
+    """
+    A helper function to process and save a transaction from
+    a CSV file.
+    """
+    amount_str_clean = re.sub(r'[$,()]', '', amount_str)
+    amount = abs(pd.to_numeric(amount_str_clean))
+    
+    predicted_type = 'Expense' 
+    predicted_category_obj = None
+    
+    if '(' in amount_str or '-' in amount_str:
+        predicted_type = 'Expense'
+    elif '+' in amount_str:
+         predicted_type = 'Income'
+
+    
+    if models:
+        try:
+            ai_type, predicted_cat_name = predict_transaction(models, description)
+            predicted_type = ai_type
+            
+            if predicted_cat_name:
+                predicted_category_obj = Category.objects.get(user=user, name=predicted_cat_name)
+        except Category.DoesNotExist:
+            predicted_category_obj = Category.objects.create(user=user, name=predicted_cat_name)
+        except:
+            pass 
+    
+    if predicted_type == 'Expense':
+        amount = -amount
+    
+    Transaction.objects.create(
+        user=user,
+        date=date, 
+        description=description,
+        amount=amount,
+        category=predicted_category_obj
+    )
+
+# --- OTHER VIEWS (No changes) ---
 @login_required
 def manage_categories(request):
     if request.method == 'POST':
@@ -250,8 +295,6 @@ def update_all_categories(request):
                 except Exception as e:
                     messages.error(request, f"Could not update transaction {transaction_id}: {e}")
         messages.success(request, 'All changes saved!')
-        
-        # --- Retrain and report accuracy ---
         try:
             models, accuracies = train_models(request.user) 
             if models:
@@ -262,7 +305,6 @@ def update_all_categories(request):
                 messages.warning(request, 'AI could not be retrained (not enough data).')
         except:
             messages.warning(request, 'AI could not be retrained.')
-            
     return redirect('dashboard')
 
 @login_required
@@ -306,13 +348,9 @@ def edit_transaction(request, pk):
 
 @login_required
 def retrain_ai(request):
-    """
-    Manually triggers the AI to retrain and reports its accuracy.
-    """
     if request.method == 'POST':
         try:
             models, accuracies = train_models(request.user) 
-            
             if models: 
                 type_acc_str = f"{accuracies['type_accuracy'] * 100:.0f}%"
                 cat_acc_str = f"{accuracies['cat_accuracy'] * 100:.0f}%"
@@ -321,7 +359,6 @@ def retrain_ai(request):
                 messages.warning(request, 'Not enough data to train the AI. Categorize at least 5 transactions first.')
         except Exception as e:
             messages.error(request, f'An error occurred during retraining: {e}')
-            
     return redirect('manage_categories')
 
 # --- Chart Data Views (JSON) ---

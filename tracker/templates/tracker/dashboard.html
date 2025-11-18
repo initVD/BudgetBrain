@@ -7,6 +7,11 @@
       <li><a href="{% url 'manage_categories' %}">Manage Categories</a></li>
     </ul>
     <ul>
+      <li title="Toggle dark/light mode">
+        <label for="theme-switcher" style="margin-bottom: 0;">
+          <input type="checkbox" id="theme-switcher" role="switch">
+        </label>
+      </li>
       <li>
         <form action="{% url 'logout' %}" method="post" style="margin: 0;">
           {% csrf_token %}
@@ -46,22 +51,22 @@
     <article>
       <hgroup>
         <h4>Total Income</h4>
-        <h3 style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
+        <h3 class="glow-green" style="color: var(--pico-color-green-500);">+${{ total_income|floatformat:2 }}</h3>
       </hgroup>
     </article>
     <article>
       <hgroup>
         <h4>Total Expenses</h4>
-        <h3 style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
+        <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ total_expenses|floatformat:2 }}</h3>
       </hgroup>
     </article>
     <article>
       <hgroup>
         <h4>Net Balance</h4>
         {% if net_balance >= 0 %}
-          <h3 style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
+          <h3 class="glow-green" style="color: var(--pico-color-green-500);">${{ net_balance|floatformat:2 }}</h3>
         {% else %}
-          <h3 style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
+          <h3 class="glow-red" style="color: var(--pico-color-red-500);">-${{ net_balance|floatformat:2|slice:"1:" }}</h3>
         {% endif %}
       </hgroup>
     </article>
@@ -103,6 +108,33 @@
       </form>
     </article>
   </div> <article>
+    
+    <form method="get" action="{% url 'dashboard' %}">
+      <div class="grid">
+        <input 
+          type="text" 
+          name="q" 
+          placeholder="Search by name..." 
+          value="{{ search_query }}">
+          
+        <select name="category">
+          <option value="">All Categories</option>
+          {% for category in categories %}
+            <option 
+              value="{{ category.id }}" 
+              {% if selected_category_id == category.id|stringformat:"s" %}selected{% endif %}>
+              {{ category.name }}
+            </option>
+          {% endfor %}
+        </select>
+        
+        <input type="date" name="date_from" value="{{ date_from }}">
+        <input type="date" name="date_to" value="{{ date_to }}">
+        
+        <button type="submit">Search</button>
+        <a href="{% url 'dashboard' %}" role="button" class="secondary">Clear</a>
+      </div>
+    </form>
     <form action="{% url 'update_all_categories' %}" method="post">
       {% csrf_token %}
       <h3>Your Transactions</h3>
@@ -164,15 +196,17 @@
     </form> <hr>
     <a href="{% url 'delete_all_transactions' %}" 
        role="button" 
-       class="contrast" 
+       class="contrast btn-delete-all" 
        style="background-color: var(--pico-color-red-600); border-color: var(--pico-color-red-600);">
        Delete All Transactions
     </a>
   </article>
 {% endblock %}
 
+
 {% block scripts %}
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  {{ block.super }} 
+
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       // --- 1. Pie Chart ---

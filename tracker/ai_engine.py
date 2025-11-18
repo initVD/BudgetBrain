@@ -17,7 +17,7 @@ def clean_text(text):
     2. Making it lowercase
     3. Removing all punctuation
     4. Removing all numbers
-    5. Stripping extra whitespace
+    5. Stripping extra whitespace   
     """
     text = str(text) 
     text = text.lower()

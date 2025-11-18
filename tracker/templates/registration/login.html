@@ -5,7 +5,16 @@
     <hgroup>
       <h2>Log In</h2>
       <h3>Welcome back to BudgetBrain</h3>
-    </hgroup>
+</hgroup>
+
+<div style="text-align: right;">
+  <label for="theme-switcher">
+    <input type="checkbox" id="theme-switcher" role="switch">
+    Dark Mode
+  </label>
+</div>
+
+
 
     {% if form.errors %}
       <p style="color: var(--pico-color-red-500);">Your username and password didn't match. Please try again.</p>
