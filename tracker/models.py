@@ -21,7 +21,7 @@ class Category(models.Model):
         unique_together = ('user', 'name')
         verbose_name_plural = "Categories"
 
-# --- NOTICE THE `CATEGORY_CHOICES` TUPLE IS GONE ---
+# --- NOTICE THE `CATEGORY_CHOICES` TUPLE IS GONE
 
 
 class Transaction(models.Model):

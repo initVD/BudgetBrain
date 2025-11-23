@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score
 
 TRAINING_FILE = 'financial_dataset_24000_realistic.csv'
 
-# --- BUG #1 (FIXED): The clean_text function was missing ---
+# --- BUG #1 (FIXED): The clean_text function was missing---
 def clean_text(text):
     """
     Cleans description text by:

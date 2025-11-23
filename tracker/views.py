@@ -601,3 +601,4 @@ def calculators(request):
         'loan_result': loan_result
     }
     return render(request, 'tracker/calculators.html', context)
+#view.py---

@@ -6,6 +6,7 @@ TRANSACTION_TYPE_CHOICES = (
     ('Income', 'Income'),
 )
 
+
 class CSVUploadForm(forms.Form):
     csv_file = forms.FileField()
 

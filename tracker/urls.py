@@ -32,5 +32,6 @@ urlpatterns = [
     path('export_pdf/', views.export_transactions_pdf, name='export_transactions_pdf'),
     
     # Tools
+    # Codes
     path('tools/', views.calculators, name='calculators'),
 ]
