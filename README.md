@@ -1,5 +1,9 @@
 # BudgetBrain: The AI-Powered Finance Tracker V1.0
 
+
+https://github.com/user-attachments/assets/fa459c98-5e6b-4bf5-a237-5115fe820485
+
+
 This is a Django project to create an AI-powered finance tracker. I am building this step-by-step to learn Django, AI, and professional development practices.
 
 ## Project Status
