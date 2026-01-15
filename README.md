@@ -1,8 +1,11 @@
 # BudgetBrain: The AI-Powered Finance Tracker V1.0
-
+## Demo:- ##
 
 https://github.com/user-attachments/assets/fa459c98-5e6b-4bf5-a237-5115fe820485
 
+# mind-map #
+
+<img width="2816" height="3537" alt="NotebookLM Mind Map (1)" src="https://github.com/user-attachments/assets/b1b2b4aa-e0f5-4f19-b7ed-61c60e5f6847" />
 
 This is a Django project to create an AI-powered finance tracker. I am building this step-by-step to learn Django, AI, and professional development practices.
 
